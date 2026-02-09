@@ -1,0 +1,11 @@
+fastapi
+langchain
+langchain-text-splitters
+pdfplumber
+python-dotenv
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-groq
+uvicorn
+python-multipart
