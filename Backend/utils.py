@@ -3,26 +3,25 @@ from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Configuration
-PINE_API_KEY = os.getenv("PINECONE_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "models/embedding-001") 
-
-pc = Pinecone(api_key=PINE_API_KEY)
-index_name = "ask-my-doc" 
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "models/gemini-embedding-001")
+# text-embedding-001 was retired; transparently upgrade older local .env files.
+if EMBEDDING_MODEL_NAME.removeprefix("models/") == "text-embedding-001":
+    EMBEDDING_MODEL_NAME = "models/gemini-embedding-001"
+index_name = os.getenv("PINECONE_INDEX_NAME", "ask-my-doc")
 
 # Initialize Embeddings
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001", 
+    model=EMBEDDING_MODEL_NAME,
     google_api_key=GEMINI_API_KEY
 )
 
-def process_document(file_path: str):
+def process_document(file_path: str, namespace: str):
     # 1. Load the PDF
     loader = PDFPlumberLoader(file_path)
     docs = loader.load()
@@ -40,31 +39,31 @@ def process_document(file_path: str):
     PineconeVectorStore.from_documents(
         documents=splits,
         embedding=embeddings,
-        index_name=index_name
+        index_name=index_name,
+        namespace=namespace
     )
 
     return len(splits)
 
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
 # Initialize Groq LLM
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile", 
+    model=GROQ_MODEL,
     temperature=0,
     api_key=GROQ_API_KEY
 )
 
-from langchain_core.messages import AIMessage, HumanMessage
-
-def get_answer(query: str, chat_history: list):
+def get_answer(query: str, chat_history: list, namespace: str):
     # 1. Retrieve relevant chunks from Pinecone
     vectorstore = PineconeVectorStore(
         index_name=index_name,
-        embedding=embeddings
+        embedding=embeddings,
+        namespace=namespace
     )
     retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 
@@ -72,6 +71,12 @@ def get_answer(query: str, chat_history: list):
     template = """
     You are a helpful assistant. Use the following context and conversation history to answer the question.
     If you don't know the answer, just say you don't know.
+
+    Write for a person reading in a chat interface: answer directly in a clean, single-column
+    reading flow. Use short paragraphs and use simple Markdown headings or bullet lists only
+    when they make the answer easier to scan. Never use HTML, tables, column layouts, or pipe
+    characters to structure information. For multiple records, use one clear heading per item
+    with concise bullets below it.
     
     Context: {context}
     

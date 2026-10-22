@@ -207,7 +207,10 @@ Create a `.env` file in the `Backend` directory with the following variables:
 PINECONE_API_KEY=your_pinecone_api_key
 GEMINI_API_KEY=your_google_ai_api_key
 GROQ_API_KEY=your_groq_api_key
-EMBEDDING_MODEL_NAME=models/embedding-001
+GROQ_MODEL=openai/gpt-oss-20b
+EMBEDDING_MODEL_NAME=models/gemini-embedding-001
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DATABASE=ask_my_doc
 ```
 
 #### Step 3: Frontend Setup

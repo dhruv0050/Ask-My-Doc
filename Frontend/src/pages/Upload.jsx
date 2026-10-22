@@ -3,12 +3,10 @@ import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { useState } from "react";
 import { FileText, Loader2, UploadCloud, X, CheckCircle, Home } from "lucide-react";
-import { useUpload } from "../App";
 
 const Upload = () => {
   const { user } = useUser();
   const navigate = useNavigate();
-  const { setHasUploadedDocument } = useUpload();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -69,8 +67,8 @@ const Upload = () => {
       if (response.status === 200) {
         setUploadSuccess(true);
         setFile(null);
-        setHasUploadedDocument(true);
-        setTimeout(() => navigate('/chat'), 1500);
+        const { document, conversation } = response.data;
+        setTimeout(() => navigate(`/chat/${document.id}?conversation=${conversation.id}`), 900);
       }
     } catch (err) {
       console.error(err);

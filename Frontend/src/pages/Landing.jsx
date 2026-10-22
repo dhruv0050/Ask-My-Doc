@@ -1,9 +1,32 @@
-import React from 'react'
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+import React, { useEffect, useState } from 'react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from "@clerk/clerk-react";
 import { Link } from 'react-router-dom';
-import { FileText, MessageSquare, Zap } from 'lucide-react';
+import { FileText, MessageSquare, Zap, History, Loader2 } from 'lucide-react';
+import axios from 'axios';
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const Landing = () => {
+  const { user } = useUser();
+  const [documents, setDocuments] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      try {
+        const { data } = await axios.get(`${API}/documents`, { params: { userId: user.id } });
+        setDocuments(data);
+      } catch {
+        setDocuments([]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    loadHistory();
+  }, [user?.id]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans relative overflow-hidden">
       {/* Subtle background glow */}
@@ -28,6 +51,10 @@ const Landing = () => {
             </SignInButton>
           </SignedOut>
           <SignedIn>
+            <Link to="/chat" className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+              <History className="w-4 h-4" />
+              Past chats
+            </Link>
             <Link to="/upload" className="text-sm text-slate-400 hover:text-white transition-colors">
               Upload
             </Link>
@@ -55,11 +82,22 @@ const Landing = () => {
         </SignedOut>
 
         <SignedIn>
-          <Link to="/upload">
-            <button className="px-6 py-3 bg-cyan-500 text-slate-950 font-medium rounded-lg hover:bg-cyan-400 transition-colors cursor-pointer">
-              Upload Document
-            </button>
-          </Link>
+          <div className="flex flex-col items-center gap-4">
+            <Link to="/upload">
+              <button className="px-6 py-3 bg-cyan-500 text-slate-950 font-medium rounded-lg hover:bg-cyan-400 transition-colors cursor-pointer">
+                Upload Document
+              </button>
+            </Link>
+            {loadingHistory ? (
+              <span className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="w-4 h-4 animate-spin" /> Checking your saved chats…</span>
+            ) : documents.length ? (
+              <Link to={`/chat/${documents[0].id}`} className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
+                <History className="w-4 h-4" /> Open past chats ({documents.length} document{documents.length === 1 ? '' : 's'})
+              </Link>
+            ) : (
+              <p className="text-sm text-slate-500">No recent chats yet — upload a PDF to start one.</p>
+            )}
+          </div>
         </SignedIn>
 
         {/* Features */}
