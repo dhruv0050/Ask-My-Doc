@@ -25,7 +25,12 @@ UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 mongo_client = MongoClient(os.getenv("MONGODB_URI", "mongodb://localhost:27017"))
-database = mongo_client[os.getenv("MONGODB_DATABASE", "ask_my_doc")]
+try:
+    database = mongo_client.get_default_database()
+    if database is None:
+        database = mongo_client[os.getenv("MONGODB_DATABASE", "AskMyDoc")]
+except Exception:
+    database = mongo_client[os.getenv("MONGODB_DATABASE", "AskMyDoc")]
 documents = database.documents
 conversations = database.conversations
 documents.create_index([("userId", 1), ("createdAt", -1)])
@@ -35,7 +40,7 @@ conversations.create_index([("userId", 1), ("documentId", 1), ("updatedAt", -1)]
 def read_root():
     return {"message": "Server is running"}
 
-from utils import process_document, get_answer
+from utils import process_document, get_answer, get_answer_with_context
 from pydantic import BaseModel
 
 def now():
@@ -140,11 +145,13 @@ def chat(request: ChatRequest):
     question = request.query.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
-    answer = get_answer(question, conversation.get("messages", [])[-12:], namespace=request.documentId)
+    rag_result = get_answer_with_context(question, conversation.get("messages", [])[-12:], namespace=request.documentId)
+    answer = rag_result["answer"]
+    contexts = rag_result.get("contexts", [])
     timestamp = now()
     updates = {"$push": {"messages": {"$each": [
         {"role": "user", "content": question, "createdAt": timestamp},
-        {"role": "assistant", "content": answer, "createdAt": timestamp},
+        {"role": "assistant", "content": answer, "contexts": contexts, "createdAt": timestamp},
     ]}}, "$set": {"updatedAt": timestamp}}
     if conversation.get("title") == "New chat":
         updates["$set"]["title"] = question[:60]

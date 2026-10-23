@@ -58,61 +58,66 @@ llm = ChatGroq(
     api_key=GROQ_API_KEY
 )
 
-def get_answer(query: str, chat_history: list, namespace: str):
-    # 1. Retrieve relevant chunks from Pinecone
+RAG_TEMPLATE = """
+You are a helpful, precise document assistant. Answer the user's question relying STRICTLY and EXCLUSIVELY on the provided Context and conversation History.
+
+CRITICAL RULES:
+1. Grounding: Every fact and claim in your answer must be directly supported by the Context below. Do NOT assume, extrapolate, or bring in outside knowledge that is not in the Context.
+2. Missing Information: If the question asks for facts, details, or topics that are NOT explicitly mentioned in the Context (such as unmentioned terms, personal details like author age/nationality, or external subjects), do NOT guess. Simply respond:
+"This information is not mentioned in the provided document."
+3. Formatting: Write in a clean, single-column reading flow with short paragraphs. Use simple Markdown headings or bullet points only when helpful. Never use HTML, tables, column layouts, or pipe characters.
+
+Context:
+{context}
+
+History:
+{history}
+
+Question:
+{question}
+
+Answer:
+"""
+custom_rag_prompt = PromptTemplate.from_template(RAG_TEMPLATE)
+
+def format_history(history):
+    formatted = ""
+    for msg in history:
+        role = msg.get("role")
+        content = msg.get("content")
+        if role == "user":
+            formatted += f"User: {content}\n"
+        elif role == "assistant":
+            formatted += f"Assistant: {content}\n"
+    return formatted
+
+def get_answer_with_context(query: str, chat_history: list, namespace: str):
+    """
+    Retrieves chunks from Pinecone and generates an answer, returning both
+    the text answer and the retrieved context chunks (essential for Ragas evaluation).
+    """
+    top_k = int(os.getenv("TOP_K", 4))
     vectorstore = PineconeVectorStore(
         index_name=index_name,
         embedding=embeddings,
         namespace=namespace
     )
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": top_k})
+    docs = retriever.invoke(query)
+    contexts = [doc.page_content for doc in docs]
 
-    # 2. Define the RAG prompt with history
-    template = """
-    You are a helpful assistant. Use the following context and conversation history to answer the question.
-    If you don't know the answer, just say you don't know.
+    chain = custom_rag_prompt | llm | StrOutputParser()
+    answer = chain.invoke({
+        "context": "\n\n".join(contexts),
+        "history": format_history(chat_history),
+        "question": query
+    })
 
-    Write for a person reading in a chat interface: answer directly in a clean, single-column
-    reading flow. Use short paragraphs and use simple Markdown headings or bullet lists only
-    when they make the answer easier to scan. Never use HTML, tables, column layouts, or pipe
-    characters to structure information. For multiple records, use one clear heading per item
-    with concise bullets below it.
-    
-    Context: {context}
-    
-    History: {history}
-    
-    Question: {question}
-    
-    Answer:
-    """
-    custom_rag_prompt = PromptTemplate.from_template(template)
+    return {
+        "answer": answer,
+        "contexts": contexts
+    }
 
-    # 3. Create the Chain
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
-    
-    def format_history(history):
-        formatted = ""
-        for msg in history:
-            role = msg.get("role")
-            content = msg.get("content")
-            if role == "user":
-                formatted += f"User: {content}\n"
-            elif role == "assistant":
-                formatted += f"Assistant: {content}\n"
-        return formatted
-
-    rag_chain = (
-        {
-            "context": (lambda x: x["question"]) | retriever | format_docs, 
-            "history": lambda x: format_history(x["history"]), 
-            "question": lambda x: x["question"]
-        }
-        | custom_rag_prompt
-        | llm
-        | StrOutputParser()
-    )
-
-    # 4. Generate Answer
-    return rag_chain.invoke({"question": query, "history": chat_history})
+def get_answer(query: str, chat_history: list, namespace: str):
+    result = get_answer_with_context(query, chat_history, namespace)
+    return result["answer"]

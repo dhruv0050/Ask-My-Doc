@@ -12,3 +12,6 @@ pinecone
 uvicorn
 python-multipart
 pymongo
+ragas
+datasets
+pandas
