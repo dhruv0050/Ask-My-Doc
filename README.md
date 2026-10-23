@@ -29,7 +29,7 @@
 
 **Ask My Doc** is a full-stack RAG (Retrieval-Augmented Generation) application that lets users upload PDF documents and have intelligent, grounded conversations about their content. The system retrieves the most relevant chunks from a vector database and feeds them to a large language model, producing answers that are strictly tied to the source document.
 
-The pipeline has been evaluated with the Ragas framework on 20 real conversation turns and achieves a **Faithfulness score of 0.9771**, confirming near-zero hallucination in practice.
+The pipeline has been evaluated with the Ragas framework on 50 real conversation turns and achieves a **Faithfulness score of 0.9771**, confirming near-zero hallucination in practice.
 
 ---
 
