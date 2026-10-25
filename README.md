@@ -101,7 +101,8 @@ The RAG pipeline quality is measured using [Ragas](https://docs.ragas.io/), an o
 2. Each assistant message has the retrieved context chunks saved at chat time
 3. Ragas evaluates Faithfulness by checking whether each answer statement is supported by the context
 4. Ragas evaluates Answer Relevancy by measuring semantic similarity between the original question and the answer
-5. Results are exported to `ragas_live_chat_report.csv`
+5. Ragas evaluates Context Precision by measuring signal-to-noise ratio in retrieved context chunks
+6. Ragas evaluates Context Recall by evaluating coverage of reference information in retrieved context
 
 ### Running the Evaluation
 

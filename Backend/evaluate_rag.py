@@ -176,12 +176,14 @@ def extract_turns_from_conversations(conversation_id: str = None, fallback_pinec
                         contexts = []
 
                 if user_question and assistant_answer and contexts:
+                    reference = next_msg.get("reference") or next_msg.get("ground_truth") or assistant_answer
                     turns.append({
                         "conversation_id": conv_id_str,
                         "conversation_title": conv_title,
                         "question": user_question,
                         "answer": assistant_answer,
-                        "contexts": contexts
+                        "contexts": contexts,
+                        "reference": reference
                     })
 
     return turns
@@ -203,25 +205,27 @@ def evaluate_turns(turns: list[dict], output_csv: str = "ragas_live_chat_report.
 
     from datasets import Dataset
     from ragas import evaluate
-    from ragas.metrics import faithfulness, answer_relevancy
+    from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
 
     questions = [t["question"] for t in turns]
     answers = [t["answer"] for t in turns]
     contexts_list = [t["contexts"] for t in turns]
+    references = [t.get("reference") or t["answer"] for t in turns]
 
     eval_dict = {
         "user_input": questions,
         "response": answers,
-        "retrieved_contexts": contexts_list
+        "retrieved_contexts": contexts_list,
+        "reference": references
     }
     ragas_dataset = Dataset.from_dict(eval_dict)
 
-    # Faithfulness & Answer Relevancy are the gold standard for live unlabelled interactions
+    # Faithfulness, Answer Relevancy, Context Precision & Context Recall
     # Set strictness=1 so Groq does not reject requests with n > 1
     answer_relevancy.strictness = 1
-    metrics = [faithfulness, answer_relevancy]
+    metrics = [faithfulness, answer_relevancy, context_precision, context_recall]
 
-    print("[1/2] Computing Faithfulness (hallucination check) & Answer Relevancy...")
+    print("[1/2] Computing Faithfulness, Answer Relevancy, Context Precision & Context Recall...")
     from ragas.run_config import RunConfig
     run_config = RunConfig(timeout=180, max_retries=5, max_workers=2)
 
@@ -246,19 +250,23 @@ def evaluate_turns(turns: list[dict], output_csv: str = "ragas_live_chat_report.
     # Print clean summary table
     print("\n----------------- PER-TURN SCORES -----------------")
     for idx, row in df.iterrows():
-        q_preview = (row["user_input"][:45] + "...") if len(row["user_input"]) > 45 else row["user_input"]
+        q_preview = (row["user_input"][:36] + "...") if len(row["user_input"]) > 36 else row["user_input"]
         f_score = row.get("faithfulness", float("nan"))
         a_score = row.get("answer_relevancy", float("nan"))
+        cp_score = row.get("context_precision", float("nan"))
+        cr_score = row.get("context_recall", float("nan"))
         f_str = f"{f_score:.2f}" if not pd.isna(f_score) else "N/A"
         a_str = f"{a_score:.2f}" if not pd.isna(a_score) else "N/A"
-        print(f" Turn #{idx + 1:<2} | Q: \"{q_preview:<48}\" | Faithfulness: {f_str} | Relevancy: {a_str}")
+        cp_str = f"{cp_score:.2f}" if not pd.isna(cp_score) else "N/A"
+        cr_str = f"{cr_score:.2f}" if not pd.isna(cr_score) else "N/A"
+        print(f" Turn #{idx + 1:<2} | Q: \"{q_preview:<39}\" | Faith: {f_str} | Rel: {a_str} | Ctx Prec: {cp_str} | Ctx Rec: {cr_str}")
 
     print("\n---------------- OVERALL PIPELINE SUMMARY ----------------")
-    for col in ["faithfulness", "answer_relevancy"]:
+    for col in ["faithfulness", "answer_relevancy", "context_precision", "context_recall"]:
         if col in df.columns:
             mean_score = df[col].dropna().mean()
             if not pd.isna(mean_score):
-                print(f"  {col.replace('_', ' ').capitalize():<24}: {mean_score:.4f}")
+                print(f"  {col.replace('_', ' ').title():<24}: {mean_score:.4f}")
     print("----------------------------------------------------------\n")
 
     return df
