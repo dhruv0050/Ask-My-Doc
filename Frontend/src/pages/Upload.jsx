@@ -4,6 +4,8 @@ import axios from "axios";
 import { useState } from "react";
 import { FileText, Loader2, UploadCloud, X, CheckCircle, Home } from "lucide-react";
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const Upload = () => {
   const { user } = useUser();
   const navigate = useNavigate();
@@ -58,7 +60,7 @@ const Upload = () => {
     formData.append("userId", user.id);
 
     try {
-      const response = await axios.post('http://localhost:8000/upload', formData, {
+      const response = await axios.post(`${API}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
