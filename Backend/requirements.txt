@@ -7,7 +7,7 @@ langchain-community
 langchain-core
 langchain-google-genai
 langchain-groq
-langchain-pinecone
+langchain-pinecone>=0.2.0
 pinecone
 uvicorn
 python-multipart
