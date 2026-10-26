@@ -29,7 +29,7 @@
 
 **Ask My Doc** is a full-stack RAG (Retrieval-Augmented Generation) application that lets users upload PDF documents and have intelligent, grounded conversations about their content. The system retrieves the most relevant chunks from a vector database and feeds them to a large language model, producing answers that are strictly tied to the source document.
 
-The pipeline has been evaluated with the Ragas framework on 50 real conversation turns and achieves a **Faithfulness score of 0.9771**, confirming near-zero hallucination in practice.
+The pipeline has been evaluated with the Ragas framework on 50 real conversation turns and achieves a **Faithfulness score of 0.9763**, confirming strong grounding of generated answers in the retrieved context.
 
 ---
 
@@ -88,8 +88,10 @@ The RAG pipeline quality is measured using [Ragas](https://docs.ragas.io/), an o
 
 | Metric | Score | What It Measures |
 |---|---|---|
-| **Faithfulness** | **0.9771** | Whether each statement in the answer is supported by the retrieved context. A score near 1.0 means near-zero hallucination. |
-| **Answer Relevancy** | **0.8358** | Whether the answer addresses the question asked. Scores above 0.80 are considered strong for open-ended document Q&A. |
+| **Faithfulness** | **0.9763** | Whether each statement in the answer is supported by the retrieved context. A score near 1.0 indicates strong grounding in the retrieved context. |
+| **Answer Relevancy** | **0.9156** | Whether the answer addresses the question asked. A higher score indicates greater relevance to the user's question. |
+| **Context Precision** | **0.9366** | Whether the retrieved context contains relevant information ranked above irrelevant information. |
+| **Context Recall** | **0.9875** | Whether the retrieved context covers the information needed to answer the question. |
 
 ### Evaluation Proof
 
@@ -156,11 +158,11 @@ python evaluate_rag.py --list-chats
 
 ## Architecture
 
-```
+```text
 +-----------------------------------------------------------------------------------+
 |                                   FRONTEND                                        |
 |  +-------------+   +-------------+   +-------------+   +---------------------+   |
-|  |   Landing   |-->|    Auth     |-->|   Upload    |-->|  Chat (Sidebar +    |   |
+|  |   Landing   |-->|    Auth     |-->|    Upload   |-->|  Chat (Sidebar +    |   |
 |  |    Page     |   |   (Clerk)   |   |    Page     |   |  Multi-Chat Panel)  |   |
 |  +-------------+   +-------------+   +-------------+   +---------------------+   |
 |              React 19 + Vite 7 + Tailwind CSS 4 + React Router 7                 |
@@ -176,7 +178,7 @@ python evaluate_rag.py --list-chats
 |   PDF Processing                        RAG Pipeline                              |
 |   - PDFPlumber extract                  - Embed query (Gemini)                   |
 |   - RecursiveCharacterTextSplitter      - Retrieve top-4 chunks (Pinecone)       |
-|   - Embed chunks (Gemini)               - Build prompt with history               |
+|   - Embed chunks (Gemini)               - Build prompt with history              |
 |   - Store in Pinecone (namespace        - Generate answer (Groq LLM)             |
 |     per documentId)                     - Save Q/A + contexts to MongoDB          |
 |   - Save metadata to MongoDB            - Return answer to frontend               |
@@ -190,7 +192,7 @@ python evaluate_rag.py --list-chats
                |  (document       |          |  - conversations    |
                |   embeddings)    |          |  - messages +       |
                +------------------+          |    contexts         |
-                                             +---------------------+
+                                              +---------------------+
 ```
 
 ### System Workflow
@@ -304,7 +306,7 @@ npm run dev
 
 ### Base URL
 
-```
+```text
 http://localhost:8000
 ```
 
@@ -318,7 +320,7 @@ GET /
 
 Response:
 ```json
-{ "message": "Server is running" }
+{"message":"Server is running"}
 ```
 
 ---
@@ -397,7 +399,7 @@ Returns the full message history for a specific conversation.
 
 ## Project Structure
 
-```
+```text
 Ask My Doc/
 ├── Backend/
 │   ├── main.py              # FastAPI server and all endpoints
@@ -467,4 +469,3 @@ This project is open source and available under the [MIT License](LICENSE).
 <p align="center">
   Made by <a href="https://github.com/dhruv0050">@dhruv0050</a>
 </p>
-
